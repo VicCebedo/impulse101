@@ -1,0 +1,115 @@
+//@version=5
+//@author=Vic Cebedo
+// "Pambayad ng utang ng pilipinas"
+
+indicator('VCC Impulse 101 v1.2.0')
+
+
+
+
+// ======================================================= BUY SIGNAL =======================================================
+// Moving averages.
+// If close and MA200 is above other MA's.
+ma_7 = ta.sma(close, 7)
+ma_21 = ta.sma(close, 21)
+ma_50 = ta.sma(close, 50)
+ma_100 = ta.sma(close, 100)
+ma_200 = ta.sma(close, 200)
+
+close_above_all_ma = close > ma_7 and close > ma_21 and close > ma_50 and close > ma_100 and close > ma_200
+ma_200_gt_all = ma_200 > ma_100 and ma_200 > ma_50 and ma_200 > ma_21 and ma_200 > ma_7
+buy_signal_ma = close_above_all_ma and ma_200_gt_all
+
+// MACD.
+fast_ma = ta.ema(close, 12)
+slow_ma = ta.ema(close, 26)
+macd = fast_ma - slow_ma
+signal = ta.ema(macd, 9)
+hist = macd - signal
+grow_above_macd = hist[1] < hist
+buy_signal_macd = macd > signal and macd > 0 and signal > 0 and grow_above_macd
+
+// SMI.
+lengthKC = 20
+val = ta.linreg(close - math.avg(math.avg(ta.highest(high, lengthKC), ta.lowest(low, lengthKC)), ta.sma(close, lengthKC)), lengthKC, 0)
+grow_above_smi = val > nz(val[1])
+buy_signal_smi = val > 0 and grow_above_smi
+
+// RSI.
+rsi = ta.rsi(close, 14)
+buy_signal_rsi = rsi > 50
+
+// Plot buy signal.
+is_buy_signal = buy_signal_smi and buy_signal_macd and buy_signal_rsi and buy_signal_ma
+
+score_signal_buy = 0
+
+if buy_signal_smi
+	score_signal_buy := score_signal_buy + 1
+
+if buy_signal_macd
+	score_signal_buy := score_signal_buy + 1
+
+if buy_signal_rsi
+	score_signal_buy := score_signal_buy + 1
+
+if buy_signal_ma
+	score_signal_buy := score_signal_buy + 1
+
+plot(score_signal_buy, title='Buy Signal', color=color.new(color.black, 0), linewidth=2, style=plot.style_stepline)
+
+
+
+
+// ======================================================= SELL SIGNAL =======================================================
+score_signal_sell_eth = 0
+score_signal_sell_btc = 0
+
+
+// Calculate sell signal score triggered by Ethereum.
+eth_shorts = math.pow(request.security('ETHUSDSHORTS', timeframe.period, close), 1.0)
+eth_longs = math.pow(request.security('ETHUSDLONGS', timeframe.period, close), 1.0)
+eth_price = request.security('BINANCE:ETHUSDT', timeframe.period, close)
+eth_rsi = ta.rsi(eth_price, 14)
+
+if eth_shorts > eth_longs
+	score_signal_sell_eth := score_signal_sell_eth - 2
+
+if eth_rsi > 75
+	score_signal_sell_eth := score_signal_sell_eth - 1
+
+
+// Calculate sell signal score triggered by Bitcoin.
+btc_shorts = math.pow(request.security('BITFINEX:BTCUSDSHORTS', timeframe.period, close), 1.0)
+btc_longs = math.pow(request.security('BITFINEX:BTCUSDLONGS', timeframe.period, close), 1.0)
+btc_price = request.security('BINANCE:BTCUSDT', timeframe.period, close)
+btc_rsi = ta.rsi(btc_price, 14)
+
+if btc_shorts > btc_longs
+	score_signal_sell_btc := score_signal_sell_btc - 2
+
+if btc_rsi > 75
+	score_signal_sell_btc := score_signal_sell_btc - 1
+
+
+// Plot sell signal.
+plot(score_signal_sell_eth, title='Sell Signal ETH', color=color.new(color.purple, 0), linewidth=2, style=plot.style_stepline)
+plot(score_signal_sell_btc, title='Sell Signal BTC', color=color.new(color.red, 0), linewidth=2, style=plot.style_stepline)
+
+
+// Set background color.
+buy_signal_bg_color = color.new(color.lime, 0)
+sell_btc_danger_color = color.new(color.red, 25)
+sell_btc_caution_color = color.new(color.red, 100)
+sell_eth_danger_color = color.new(color.red, 25)
+sell_eth_caution_color = color.new(color.red, 100)
+
+sell_btc_danger = btc_shorts > btc_longs and btc_rsi > 75
+sell_btc_caution = btc_shorts > btc_longs or btc_rsi > 75
+sell_eth_danger = eth_shorts > eth_longs and eth_rsi > 75
+sell_eth_caution = eth_shorts > eth_longs or eth_rsi > 75
+
+bgcolor(is_buy_signal ? buy_signal_bg_color : sell_btc_danger ? sell_btc_danger_color : sell_btc_caution ? sell_btc_caution_color : sell_eth_danger ? sell_eth_danger_color : sell_eth_caution ? sell_eth_caution_color : na)
+
+
+
